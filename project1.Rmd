@@ -1,0 +1,270 @@
+---
+title: "COVID-19"
+author: "Team Delta"
+date: 2021-10-20
+output:
+  github_document:
+    toc: true
+---
+
+# Project 1
+
+## Team Check-In October 14
+
+1.  What's your question?
+
+    -   Is there a correlation between temperature and COVID cases?
+
+2.  What data do you plan to use to answer this question?
+
+3.  What challenges do you anticipate encountering?
+
+4.  What level of complexity of the final product are you aiming for?
+
+5.  What figures / tables do you anticipate producing?
+
+<!-- -------------------------------------------------- -->
+
+```{r setup}
+library(tidyverse)
+```
+
+# Data
+
+<!-- -------------------------------------------------- -->
+
+We used several different sources of data for this project.
+
+1.  County-level population estimates ([Census Bureau](data.census.gov))
+2.  County-level COVID-19 counts (New York Times)
+3.  Weather data
+
+### **Load Census Data.** Make sure the column names are `id, Geographic Area Name, Estimate!!Total, Margin of Error!!Total`.
+
+See the README.md file for instructions to download this data from the Census Bureau website.
+
+```{r census-data}
+filename <- "./data/census.csv"
+
+## Load the data
+df_pop <- read_csv(filename, skip = 1)
+df_pop %>% knitr::kable()
+```
+
+### Automated Download of NYT Data
+
+The New York Times is publishing up-to-date data on COVID-19 on [GitHub](https://github.com/nytimes/covid-19-data).
+
+```{r covid-data}
+url_counties <- "https://raw.githubusercontent.com/nytimes/covid-19-data/master/us-counties.csv"
+
+filename_nyt <- "./data/nyt_counties.csv"
+
+## Download the data locally
+curl::curl_download(
+        url_counties,
+        destfile = filename_nyt
+      )
+
+## Loads the downloaded csv
+df_covid <- read_csv(filename_nyt)
+```
+
+Re-running this code will pull the most recent version of the NY Times data.
+
+### Weather Data
+
+Follow instructions linked [here](https://docs.ropensci.org/rnoaa/articles/rnoaa.html)
+
+```{r weather-data-setup}
+library('rnoaa')
+# Replace with your key from here: https://www.ncdc.noaa.gov/cdo-web/token
+# Remember to delete your actual API key before git pushing!
+options(noaakey = "YOUR_API-KEY")
+```
+
+I have not been able to figure out a way to just set everything equal to a data frame. It seems like you need to make calls for a specific location using the functions.
+
+Once that is figured out, we need to connect the datasets using location and time. I think there should be some way to connect them using the ZIP (each county has 1 FIPS but can have multiple ZIP codes, however, we could probably find a lookup table of FIPS -\> ZIP in order to connect the 2 tables). If not, the location ID also uses the FIPS.
+
+```{r weather-data}
+# ncdc_locs(locationcategoryid='ZIP', sortfield='name', sortorder='desc')
+# ncdc_stations(datasetid='GHCND', locationid='FIPS:12017', stationid='GHCND:USC00084289')
+
+# Little plot example
+out <- ncdc(
+    datasetid='GHCND', # Daily summaries dataset
+    stationid='GHCND:USC00190120', # dataset:stationid, this is Amherst, MA
+    datatypeid='TMAX', # can be PRCP (precipitation), TMAX, TMIN, or TAVG(sometimes)
+    startdate = '2020-01-01', 
+    enddate = '2020-12-31', 
+    limit = 500 # I think number of datapoints, but it is weird
+  )
+ncdc_plot(out, breaks="1 month", dateformat="%d/%m")
+# Temperatures are in 1/10 of a degree C, so TMAX = 300 means 30 C
+out
+```
+
+```{r weather-data}
+stations <-
+  ghcnd_stations(refresh = FALSE) %>%
+  filter(last_year == 2021 & str_detect(id, "US")) 
+# filter for stations still operating in 2021 and stations in the US
+# There are 136,293 stations meeting these criteria
+stations
+```
+
+# Join the Data
+
+<!-- -------------------------------------------------- -->
+
+```{r glimpse}
+df_pop %>% glimpse
+df_covid %>% glimpse
+```
+
+Use [FIPS county codes](https://en.wikipedia.org/wiki/FIPS_county_code) to join datasets. The last `5` digits of the `id` column in `df_pop` is the FIPS county code, while the NYT data `df_covid` already contains the `fips`.
+
+```{r q3-task}
+df_q3 <- 
+  df_pop %>%
+  mutate("fips" = str_remove(id, "\\d+[:alpha:]+"))
+glimpse(df_q3)
+```
+
+Use the following test to check your answer.
+
+```{r q3-tests}
+## NOTE: No need to change this
+## Check known county
+assertthat::assert_that(
+              (df_q3 %>%
+              filter(str_detect(`Geographic Area Name`, "Autauga County")) %>%
+              pull(fips)) == "01001"
+            )
+print("Very good!")
+```
+
+### **q4** Join `df_covid` with `df_q3` by the `fips` column. Use the proper type of join to preserve *only* the rows in `df_covid`.
+
+```{r q4-task}
+## TASK: Join df_covid and df_q3 by fips.
+df_q4 <- 
+  df_covid %>%
+  inner_join(df_q3, by = "fips")
+glimpse(df_q4)
+```
+
+For convenience, I down-select some columns and produce more convenient column names.
+
+```{r rename}
+## NOTE: No need to change; run this to produce a more convenient tibble
+df_data <-
+  df_q4 %>%
+  select(
+    date,
+    county,
+    state,
+    fips,
+    cases,
+    deaths,
+    population = `Estimate!!Total`
+  )
+glimpse(df_data)
+```
+
+# Analyze
+
+<!-- -------------------------------------------------- -->
+
+Now that we've done the hard work of loading and wrangling the data, we can finally start our analysis. Our first step will be to produce county population-normalized cases and death counts. Then we will explore the data.
+
+## Normalize
+
+<!-- ------------------------- -->
+
+### **q5** Use the `population` estimates in `df_data` to normalize `cases` and `deaths` to produce per 100,000 counts [3]. Store these values in the columns `cases_per100k` and `deaths_per100k`.
+
+```{r q5-task}
+## TASK: Normalize cases and deaths
+df_normalized <-
+  df_data %>%
+  group_by(county) %>%
+  mutate("cases_per100k" = (cases / population) * 100000) %>%
+  mutate("deaths_per100k" = (deaths / population) * 100000) %>%
+  ungroup()
+
+glimpse(df_normalized)
+```
+
+You may use the following test to check your work.
+
+```{r q5-tests}
+## NOTE: No need to change this
+## Check known county data
+if (any(df_normalized %>% pull(date) %>% str_detect(., "2020-01-21"))) {
+  assertthat::assert_that(TRUE)
+} else {
+  print(str_c(
+    "Date 2020-01-21 not found; did you download the historical data (correct),",
+    "or just the most recent data (incorrect)?",
+    sep = " "
+  ))
+  assertthat::assert_that(FALSE)
+}
+
+assertthat::assert_that(
+              abs(df_normalized %>%
+               filter(
+                 str_detect(county, "Snohomish"),
+                 date == "2020-01-21"
+               ) %>%
+              pull(cases_per100k) - 0.127) < 1e-3
+            )
+assertthat::assert_that(
+              abs(df_normalized %>%
+               filter(
+                 str_detect(county, "Snohomish"),
+                 date == "2020-01-21"
+               ) %>%
+              pull(deaths_per100k) - 0) < 1e-3
+            )
+
+print("Excellent!")
+```
+
+## EDA
+
+<!-- ------------------------- -->
+
+### Aside: Some visualization tricks
+
+<!-- ------------------------- -->
+
+These data get a little busy, so it's helpful to know a few `ggplot` tricks to help with the visualization. Here's an example focused on Massachusetts.
+
+```{r ma-example}
+## NOTE: No need to change this; just an example
+df_normalized %>%
+  filter(state == "Massachusetts") %>%
+
+  ggplot(
+    aes(date, cases_per100k, color = fct_reorder2(county, date, cases_per100k))
+  ) +
+  geom_line() +
+  scale_y_log10(labels = scales::label_number_si()) +
+  scale_color_discrete(name = "County") +
+  theme_minimal() +
+  labs(
+    x = "Date",
+    y = "Cases (per 100,000 persons)"
+  )
+```
+
+*Tricks*:
+
+-   I use `fct_reorder2` to *re-order* the color labels such that the color in the legend on the right is ordered the same as the vertical order of rightmost points on the curves. This makes it easier to reference the legend.
+-   I manually set the `name` of the color scale in order to avoid reporting the `fct_reorder2` call.
+-   I use `scales::label_number_si` to make the vertical labels more readable.
+-   I use `theme_minimal()` to clean up the theme a bit.
+-   I use `labs()` to give manual labels.

@@ -17,11 +17,27 @@ output:
 
 2.  What data do you plan to use to answer this question?
 
+    -   Hopefully NOAA R weather library data
+
 3.  What challenges do you anticipate encountering?
+
+    -   Difficulty with getting data to work for our purposes
+
+    -   The weather dataset is extremely large, so operations may take significant time to run if we don't design code to account for this
+
+    -   Determining if any trends we see are actually significant or due to coincidence or other variables (eg. cold weather around holidays)
 
 4.  What level of complexity of the final product are you aiming for?
 
+    -   We have not discussed this yet as a team
+
 5.  What figures / tables do you anticipate producing?
+
+    -   We have not discussed this yet, but some ideas are:
+
+    -   A line plot of weather and COVID cases on the same axis, maybe faceted or color-coded by different regions
+
+    -   A line plot of how comfortable outside weather is, vs COVID cases, with an R value
 
 <!-- -------------------------------------------------- -->
 
@@ -80,7 +96,8 @@ Follow instructions linked [here](https://docs.ropensci.org/rnoaa/articles/rnoaa
 library('rnoaa')
 # Replace with your key from here: https://www.ncdc.noaa.gov/cdo-web/token
 # Remember to delete your actual API key before git pushing!
-options(noaakey = "YOUR_API-KEY")
+# options(noaakey = "YOUR_API-KEY")
+options(noaakey = "NyqQflFurAAevqdjCxMUedSgCKwybJWj")
 ```
 
 I have not been able to figure out a way to just set everything equal to a data frame. It seems like you need to make calls for a specific location using the functions.

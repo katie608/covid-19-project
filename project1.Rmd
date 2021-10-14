@@ -102,6 +102,20 @@ options(noaakey = "YOUR_API-KEY")
 I have not been able to figure out a way to just set everything equal to a data frame. It seems like you need to make calls for a specific location using the functions.
 
 Once that is figured out, we need to connect the datasets using location and time. I think there should be some way to connect them using the ZIP (each county has 1 FIPS but can have multiple ZIP codes, however, we could probably find a lookup table of FIPS -\> ZIP in order to connect the 2 tables). If not, the location ID also uses the FIPS.
+```{r}
+test_function <- 
+  function(FIPS) {
+    out <- ncdc(
+    datasetid='GHCND', # Daily summaries dataset
+    locationid = str_c("FIPS:", FIPS),
+    datatypeid='TAVG', # can be PRCP (precipitation), TMAX,      TMIN, or TAVG(sometimes)
+    startdate = '2020-01-01', 
+    enddate = '2020-12-31' ,
+    limit = 1000 
+  )
+  out$data
+  }
+```
 
 ```{r weather-data}
 # ncdc_locs(locationcategoryid='ZIP', sortfield='name', sortorder='desc')
@@ -110,17 +124,27 @@ Once that is figured out, we need to connect the datasets using location and tim
 # Little plot example
 out <- ncdc(
     datasetid='GHCND', # Daily summaries dataset
-    stationid='GHCND:USC00190120', # dataset:stationid, this is Amherst, MA
-    datatypeid='TMAX', # can be PRCP (precipitation), TMAX, TMIN, or TAVG(sometimes)
+    locationid='FIPS:22071',
+    # stationid='GHCND:USC00190120', # dataset:stationid, this is Amherst, MA
+    datatypeid='TAVG', # can be PRCP (precipitation), TMAX, TMIN, or TAVG(sometimes)
     startdate = '2020-01-01', 
-    enddate = '2020-12-31', 
-    limit = 500 # I think number of datapoints, but it is weird
+    enddate = '2020-12-31' ,
+    limit = 1000 # I think number of datapoints, but it is weird
   )
-ncdc_plot(out, breaks="1 month", dateformat="%d/%m")
-# Temperatures are in 1/10 of a degree C, so TMAX = 300 means 30 C
+
 out
 ```
+```{r}
+out$data %>% 
+  mutate(date = lubridate::ymd_hms(date)) %>% 
+  ggplot(aes(x = date, y = value)) +
+  geom_point() +
+  geom_smooth()
 
+# ncdc_plot(out, breaks="1 month", dateformat="%m")
+# Temperatures are in 1/10 of a degree C, so TMAX = 300 means 30 C
+```
+ 
 ```{r weather-data}
 stations <-
   ghcnd_stations(refresh = FALSE) %>%

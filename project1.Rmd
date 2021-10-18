@@ -97,7 +97,7 @@ df_covid %>% glimpse
 ## NOTE: No need to change; run this to produce a more convenient tibble
 df_data <-
   df_covid %>%
-  inner_join(df_pop, by = "fips") %>% 
+  left_join(df_pop, by = "fips") %>% 
   select(
     date,
     county,
@@ -155,7 +155,7 @@ Follow instructions linked [here](https://docs.ropensci.org/rnoaa/articles/rnoaa
 library('rnoaa')
 # Replace with your key from here: https://www.ncdc.noaa.gov/cdo-web/token
 # Remember to delete your actual API key before git pushing!
-options(noaakey = "YOUR_API-KEY")
+options(noaakey = "zxUCGojxxFBGypgIamlUUuLhbegYtqVl")
 ```
 
 I have not been able to figure out a way to just set everything equal to a data frame. It seems like you need to make calls for a specific location using the functions.
@@ -164,14 +164,26 @@ Once that is figured out, we need to connect the datasets using location and tim
 ```{r}
 get_weather_data <- 
   function(FIPS) {
-    out <- ncdc(
+    out1 <- ncdc(
     datasetid='GHCND', # Daily summaries dataset
     locationid = str_c("FIPS:", FIPS),
-    datatypeid='TAVG', # can be PRCP (precipitation), TMAX,      TMIN, or TAVG(sometimes)
-    startdate = '2020-01-01', 
+    datatypeid='TAVG',
+    startdate = '2020-01-01',
     enddate = '2020-12-31' ,
-    limit = 1000 
-  )
+    limit = 1000
+    )
+    
+    out2 <- ncdc(
+    datasetid='GHCND', # Daily summaries dataset
+    locationid = str_c("FIPS:", FIPS),
+    datatypeid='TAVG',
+    startdate = '2021-01-01',
+    enddate = '2021-10-16',
+    limit = 1000
+    )
+    
+  out <- bind_rows(out1$data, out2$data)
+  # out <- ncdc_combine(out1, out2)
   out
   }
 ```
@@ -187,14 +199,12 @@ out
 ```
 
 ```{r}
-out$data %>% 
-  mutate(date = lubridate::ymd_hms(date)) %>% 
-  ggplot(aes(x = date, y = value)) +
+out%>% 
+  ggplot(aes(x = as.Date(date), y = value)) +
   geom_point() +
   geom_smooth()
 
-# ncdc_plot(out, breaks="1 month", dateformat="%m")
-# Temperatures are in 1/10 of a degree C, so TMAX = 300 means 30 C
+
 ```
  
 ```{r weather-data}
@@ -209,7 +219,7 @@ stations
 ## Plot Single County
 ```{r}
 county_fips = '22071'
-weather_data <- get_weather_data(county_fips)$data %>% 
+weather_data <- get_weather_data(county_fips) %>% 
   mutate(date = as.Date(date)) 
 covid_data <- df_daily %>% filter(fips == county_fips)
 ```
@@ -217,20 +227,51 @@ covid_data <- df_daily %>% filter(fips == county_fips)
 
 ```{r}
 combined_data <- covid_data %>%
-  inner_join(weather_data, by = "date")
+  left_join(weather_data, by = "date") %>% 
+  mutate(temp = value/10) %>% 
+  select(-value)
 ```
 
 
 ```{r}
 combined_data %>% 
   ggplot(aes(x = date)) +
-  geom_point(mapping = aes(y = value, color = "Temperature")) +
-  geom_smooth(mapping = aes(y = value, color = "Temperature"))+
-  geom_point(mapping = aes(y = daily_case_count, color = "Daily Cases")) 
-  # geom_smooth() 
+  
+  geom_smooth(mapping = aes(
+    y = temp, 
+    color = "Temperature")
+  ) +
+  
+  geom_line(mapping = aes(
+    y = daily_case_count / 10,
+    color = "Daily Cases")
+  ) +
+  
+  scale_y_continuous(
+    name = "Temperature (C)",
+    # Add a second axis and specify its features
+    sec.axis = sec_axis(
+      trans = ~.*10, 
+      name="Cases/day (avg)"
+      )
+  ) +
+  
+  theme(
+    axis.text.x = element_text(angle = 90),
+    legend.title = element_blank()
+    ) +
+  ggtitle("Correlation between Covid Cases and Weather") +
+  scale_x_date(date_labels="%b %y",date_breaks  ="1 month")
 
 ```
 
+```{r}
+combined_data %>% 
+  summarise(median_temp = median(temp, na.rm = TRUE))
+```
+```{r}
+25.3	
+```
 
 # Join the Data
 

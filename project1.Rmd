@@ -155,7 +155,7 @@ Follow instructions linked [here](https://docs.ropensci.org/rnoaa/articles/rnoaa
 library('rnoaa')
 # Replace with your key from here: https://www.ncdc.noaa.gov/cdo-web/token
 # Remember to delete your actual API key before git pushing!
-options(noaakey = "zxUCGojxxFBGypgIamlUUuLhbegYtqVl")
+options(noaakey = "mXlBMxxMYipwDjTiNYqCqZSTVjvFyDSH")
 ```
 
 I have not been able to figure out a way to just set everything equal to a data frame. It seems like you need to make calls for a specific location using the functions.
@@ -219,17 +219,27 @@ stations
 ## Plot Single County
 ```{r}
 county_fips = '22071'
+weather_data <- get_weather_data(county_fips)
+weather_data
+```
+
+
+```{r}
 weather_data <- get_weather_data(county_fips) %>% 
   mutate(date = as.Date(date)) 
-covid_data <- df_daily %>% filter(fips == county_fips)
+covid_data <- df_daily %>% 
+  filter(fips == county_fips)
 ```
 
 
 ```{r}
 combined_data <- covid_data %>%
   left_join(weather_data, by = "date") %>% 
-  mutate(temp = value/10) %>% 
+  mutate(temp = value/10) %>%
+  mutate(temp_from_median = abs(temp - 22)) %>% 
   select(-value)
+
+combined_data
 ```
 
 
@@ -238,13 +248,15 @@ combined_data %>%
   ggplot(aes(x = date)) +
   
   geom_smooth(mapping = aes(
-    y = temp, 
-    color = "Temperature")
+    y = temp_from_median, 
+    color = "Temperature"),
+    span = .1
   ) +
   
-  geom_line(mapping = aes(
+  geom_smooth(mapping = aes(
     y = daily_case_count / 10,
-    color = "Daily Cases")
+    color = "Daily Cases"),
+    span = .01
   ) +
   
   scale_y_continuous(
@@ -260,17 +272,77 @@ combined_data %>%
     axis.text.x = element_text(angle = 90),
     legend.title = element_blank()
     ) +
-  ggtitle("Correlation between Covid Cases and Weather") +
-  scale_x_date(date_labels="%b %y",date_breaks  ="1 month")
+  labs(title = "Orleans Parish", subtitle = " Correlation Between Covid Cases and Temperature") +
 
+  # ggtitle("Covid Cases vs Temperature in Orleans Parish") +
+  scale_x_date(date_labels="%b %y",date_breaks  ="3 month")
+
+```
+```{r}
+get_county_data <- 
+  function(county_fips) {
+    weather_data <- get_weather_data(county_fips) %>%       mutate(date = as.Date(date)) 
+    
+    covid_data <- df_daily %>% 
+      filter(fips == county_fips)
+    
+    combined_data <- covid_data %>%
+      left_join(weather_data, by = "date") %>% 
+      mutate(temp = value/10) %>%
+      mutate(temp_from_median = abs(temp - 22)) %>% 
+      select(-value)
+    
+    combined_data
+  }
+```
+
+
+```{r}
+plot_county_data <- 
+  function(combined_data) {
+  combined_data %>% 
+        ggplot(aes(x = date)) +
+        
+        geom_smooth(mapping = aes(
+          y = temp_from_median, 
+          color = "Temperature"),
+          span = .1
+        ) +
+        
+        geom_smooth(mapping = aes(
+          y = daily_case_count / 10,
+          color = "Daily Cases"),
+          span = .01
+        ) +
+  
+        scale_y_continuous(
+          name = "Temperature (C)",
+          sec.axis = sec_axis(
+            trans = ~.*10, 
+            name="Cases/day (avg)"
+            )
+        ) +
+        
+        theme(
+          axis.text.x = element_text(angle = 90),
+          legend.title = element_blank()
+        ) +
+        labs(title = "Orleans Parish", 
+             subtitle = "Correlation Between Covid Cases and Temperature"
+        ) +
+    
+        scale_x_date(date_labels="%b %y",
+                     date_breaks  ="3 month")
+  
+  }
 ```
 
 ```{r}
-combined_data %>% 
-  summarise(median_temp = median(temp, na.rm = TRUE))
+data <- get_county_data("22071")
 ```
+
 ```{r}
-25.3	
+plot_county_data(data)
 ```
 
 # Join the Data

@@ -1,0 +1,211 @@
+---
+title: "COVID-19"
+author: "Team Delta"
+date: 2021-10-20
+output:
+  github_document:
+    toc: true
+---
+
+# Project 1
+
+<!-- -------------------------------------------------- -->
+
+```{r setup}
+library(tidyverse)
+```
+
+# Data
+
+<!-- -------------------------------------------------- -->
+
+We used several different sources of data for this project.
+
+1.  County-level population estimates ([Census Bureau](data.census.gov))
+2.  County-level COVID-19 counts (New York Times)
+3.  Weather data
+
+### **Load Census Data.** Make sure the column names are `id, Geographic Area Name, Estimate!!Total, Margin of Error!!Total`.
+
+See the README.md file for instructions to download this data from the Census Bureau website.
+
+```{r census-data}
+filename <- "./data/census.csv"
+
+## Load the data
+df_pop <- read_csv(filename, skip = 1)
+df_pop %>% knitr::kable()
+```
+
+### Automated Download of NYT Data
+
+The New York Times is publishing up-to-date data on COVID-19 on [GitHub](https://github.com/nytimes/covid-19-data).
+
+```{r covid-data}
+url_counties <- "https://raw.githubusercontent.com/nytimes/covid-19-data/master/us-counties.csv"
+
+filename_nyt <- "./data/nyt_counties.csv"
+
+## Download the data locally
+curl::curl_download(
+        url_counties,
+        destfile = filename_nyt
+      )
+
+## Loads the downloaded csv
+df_covid <- read_csv(filename_nyt)
+```
+
+Re-running this code will pull the most recent version of the NY Times data.
+
+### Join COVID and Census data
+
+Also normalize COVID Data by cases per 100k
+
+```{r normalize-covid-data}
+df_pop <- 
+  df_pop %>%
+  mutate("fips" = str_remove(id, "\\d+[:alpha:]+"))
+
+df_covid <- 
+  df_covid %>%
+  left_join(df_pop, by = "fips")
+
+df_covid <-
+  df_covid %>%
+  select(
+    date,
+    county,
+    state,
+    fips,
+    cases,
+    deaths,
+    population = `Estimate!!Total`
+  )
+
+df_covid <-
+  df_covid %>%
+  mutate("cases_per100k" = (cases / population) * 100000) %>%
+  mutate("deaths_per100k" = (deaths / population) * 100000) %>%
+  ungroup()
+```
+
+### Weather Data
+
+Follow instructions linked [here](https://docs.ropensci.org/rnoaa/articles/rnoaa.html)
+
+```{r weather-data-setup}
+library('rnoaa')
+# Replace with your key from here: https://www.ncdc.noaa.gov/cdo-web/token
+# Remember to delete your actual API key before git pushing!
+# options(noaakey = "YOUR_API-KEY")
+options(noaakey = "NyqQflFurAAevqdjCxMUedSgCKwybJWj")
+```
+
+```{r weather-variables}
+# set some weather variables used to import data
+start_date <- '2010-01-01'
+end_date <- '2010-12-31'
+location_id <- 'FIPS:04013'
+lim <- 1000
+ideal <- 22
+```
+
+```{r weather-data}
+get_weather_data <- 
+  function(start_date, end_date) {
+    normals <- ncdc(
+      datasetid='NORMAL_DLY', 
+      locationid = location_id,
+      datatypeid='dly-tmax-normal',
+      startdate = start_date, 
+      enddate = end_date,
+      limit = lim
+    )
+    df_weather <- normals$data 
+    df_weather <-
+      df_weather %>%
+      drop_na
+    df_weather <-
+      df_weather %>%
+      mutate(date = lubridate::ymd_hms(date)) %>%
+      group_by(date) %>%
+      mutate(
+        temp = mean("value") / 10
+      ) 
+    glimpse(df_weather)
+    df_weather <-
+      df_weather[c("date", "temp")] %>%
+      distinct()
+    
+  df_weather
+  }
+
+# out <- 
+for (month in 1:2) {
+  start <- sprintf('2010-%02d-01', month)
+  end <- sprintf('2010-%02d-28', month)
+  out <- get_weather_data(start, end)
+  # glimpse(out)
+}
+
+```
+
+```{}
+```
+
+# Analyze
+
+<!-- -------------------------------------------------- -->
+
+Plot Weather Data
+
+```{r}
+
+df_weather %>%
+  # mutate(comfy = ideal - max(c(abs(ideal - avg), abs(ideal - high)))) %>%
+  ggplot(aes(x = date, y = value)) +
+  geom_point()
+
+```
+
+```{r}
+df_covid %>%
+  filter(state == "Arizona" & county == "Maricopa") %>%
+  mutate(delta_cases = cases_per100k - lag(cases_per100k)) %>%
+  filter(delta_cases > 0) %>%
+  ggplot(
+    aes(date, delta_cases)
+  ) +
+  geom_line() +
+  scale_color_discrete(name = "County") +
+  theme_minimal() +
+  labs(
+    x = "Date",
+    y = "New Cases/Day (per 100,000 persons)",
+    title = "New Cases Per Day"
+  )
+```
+
+```{r}
+df_middlesex <-
+  df_covid %>%
+  filter(state == "Arizona" & county == "Maricopa") %>%
+  left_join(df_weather, by = "date")
+
+df_middlesex %>%
+  mutate(
+    comfy = ideal - max(c(abs(ideal - avg), abs(ideal - high))),
+    delta_cases = cases_per100k - lag(cases_per100k)
+  ) %>%
+  # filter(delta_cases > 0) %>%
+  ggplot(aes(x = date)) +
+  geom_smooth(aes(y = avg), color = "red") +
+  geom_smooth(aes(y = delta_cases)) +
+  # xlim("2020-03-18", "2020-10-18") +
+  scale_y_continuous(
+    name = "Temperature (C)",
+    # Add a second axis and specify its features
+    sec.axis = sec_axis(trans = ~.*10, name="Cases/day (avg)")
+  )
+```

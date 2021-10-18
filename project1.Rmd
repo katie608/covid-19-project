@@ -208,7 +208,7 @@ df_weather %>%
 df_covid %>%
   filter(state == "Connecticut" & county == "Middlesex") %>%
   mutate(delta_cases = cases_per100k - lag(cases_per100k)) %>%
-  filter(delta_cases > 0) %>%
+  # filter(delta_cases > 0) %>%
   ggplot(
     aes(date, delta_cases)
   ) +
@@ -226,21 +226,27 @@ df_covid %>%
 df_middlesex <-
   df_covid %>%
   filter(state == "Connecticut" & county == "Middlesex") %>%
-  left_join(df_weather, by = "date")
-
-df_middlesex %>%
+  left_join(df_weather, by = "date") %>%
   mutate(
-    comfy = ideal - max(c(abs(ideal - avg), abs(ideal - high))),
+    comfy1 = abs(ideal - avg),
+    comfy2 = abs(ideal - high),
     delta_cases = cases_per100k - lag(cases_per100k)
   ) %>%
+  group_by(date) %>%
+  mutate(comfy = max(comfy1, comfy2), .keep = c("unused"))
+
+df_middlesex
+
+df_middlesex %>%
   # filter(delta_cases > 0) %>%
   ggplot(aes(x = date)) +
-  geom_smooth(aes(y = avg), color = "red") +
-  geom_smooth(aes(y = delta_cases)) +
+  geom_smooth(aes(y = comfy), color = "red", span = 0.2, se = FALSE) +
+  geom_smooth(aes(y = delta_cases), span = 0.1, se = FALSE) +
   # xlim("2020-03-18", "2020-10-18") +
   scale_y_continuous(
     name = "Temperature (C)",
     # Add a second axis and specify its features
-    sec.axis = sec_axis(trans = ~.*10, name="Cases/day (avg)")
-  )
+    sec.axis = sec_axis(trans = ~.*1, name="Cases/day (avg)")
+  ) +
+  labs()
 ```

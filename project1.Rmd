@@ -147,7 +147,7 @@ df_daily <- df_tidy %>%
                                            
 ```
 
-### Weather Data
+### Weather Data EDA
 
 Follow instructions linked [here](https://docs.ropensci.org/rnoaa/articles/rnoaa.html)
 
@@ -161,6 +161,11 @@ options(noaakey = "mXlBMxxMYipwDjTiNYqCqZSTVjvFyDSH")
 I have not been able to figure out a way to just set everything equal to a data frame. It seems like you need to make calls for a specific location using the functions.
 
 Once that is figured out, we need to connect the datasets using location and time. I think there should be some way to connect them using the ZIP (each county has 1 FIPS but can have multiple ZIP codes, however, we could probably find a lookup table of FIPS -\> ZIP in order to connect the 2 tables). If not, the location ID also uses the FIPS.
+
+```{r}
+?ncdc
+```
+
 
 ```{r get_weather_data}
 get_weather_data <- 
@@ -184,9 +189,15 @@ get_weather_data <-
     )
     
   out <- bind_rows(out1$data, out2$data)
+  #Combine took too long
   # out <- ncdc_combine(out1, out2)
   out
   }
+```
+
+```{r}
+get_weather_data("36001") %>% 
+  head()
 ```
 
 

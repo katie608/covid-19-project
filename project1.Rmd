@@ -222,20 +222,23 @@ get_county_data <-
 
 ```{r plot_county_data}
 plot_county_data <- 
-  function(combined_data) {
+  function(combined_data, county_name) {
+  titlename <- county_name
   combined_data %>% 
         ggplot(aes(x = date)) +
         
         geom_smooth(mapping = aes(
           y = temp_from_median, 
-          color = "Difference in Temperature from 21C"),
-          span = .1
+          color = "Difference in \nTemperature \nfrom 21C"),
+          span = .1,
+          se = FALSE
         ) +
         
         geom_smooth(mapping = aes(
           y = daily_case_count / 10,
           color = "Daily Cases"),
-          span = .01
+          span = .01,
+          se = FALSE
         ) +
   
         scale_y_continuous(
@@ -250,29 +253,79 @@ plot_county_data <-
           axis.text.x = element_text(angle = 90),
           legend.title = element_blank()
         ) +
-        labs(title = "Orleans Parish (County)", 
+        labs(title = titlename, 
              subtitle = "Correlation Between Covid Cases and Temperature"
         ) +
     
         scale_x_date(date_labels="%b %y",
                      date_breaks  ="3 month")
-  
   }
 ```
 
 ```{r}
-data <- get_county_data("22071")
+data1 <- get_county_data("47157")
+data2 <- get_county_data("17031")
+data3 <- get_county_data("36001")
+data4 <- get_county_data("13121")
+data5 <- get_county_data("04013")
+data6 <- get_county_data("41051")
+data7 <- get_county_data("48113")
+data8 <- get_county_data("22071")
 ```
 
 ```{r}
-plot_county_data(data)
+plot_county_data(data1, "Shelby County (TN)")
+plot_county_data(data2, "Cook County (IL)")
+plot_county_data(data3, "Albany County (NY)")
+plot_county_data(data4, "Fulton County (GA)")
+plot_county_data(data5, "Maricopa County (AZ)")
+plot_county_data(data6, "Multnomah County (OR)")
+plot_county_data(data7, "Dallas County (TX)")
+plot_county_data(data8, "Orleans Parish (GA)")
+
 ```
 ```{r correlation}
-data %>%
+
+pearson1 <- data1 %>%
+  summarize(rho = cor(temp_from_median, daily_case_count, method = "pearson"))
+pearson2 <- data2 %>%
+  summarize(rho = cor(temp_from_median, daily_case_count, method = "pearson"))
+pearson3 <- data3 %>%
+  summarize(rho = cor(temp_from_median, daily_case_count, method = "pearson"))
+pearson4 <- data4 %>%
+  summarize(rho = cor(temp_from_median, daily_case_count, method = "pearson"))
+pearson5 <- data5 %>%
+  summarize(rho = cor(temp_from_median, daily_case_count, method = "pearson"))
+pearson6 <- data6 %>%
+  summarize(rho = cor(temp_from_median, daily_case_count, method = "pearson"))
+pearson7 <- data7 %>%
+  summarize(rho = cor(temp_from_median, daily_case_count, method = "pearson"))
+pearson8 <- data8 %>%
   summarize(rho = cor(temp_from_median, daily_case_count, method = "pearson"))
 
-data %>%
+rho_pearson <- data.frame(pearson1, pearson2, pearson3, pearson4, pearson5, pearson6, pearson7, pearson8)
+rho_pearson
+
+
+spearman1 <- data1 %>%
   summarize(rho = cor(temp_from_median, daily_case_count, method = "spearman"))
+spearman2 <- data2 %>%
+  summarize(rho = cor(temp_from_median, daily_case_count, method = "spearman"))
+spearman3 <- data3 %>%
+  summarize(rho = cor(temp_from_median, daily_case_count, method = "spearman"))
+spearman4 <- data4 %>%
+  summarize(rho = cor(temp_from_median, daily_case_count, method = "spearman"))
+spearman5 <- data5 %>%
+  summarize(rho = cor(temp_from_median, daily_case_count, method = "spearman"))
+spearman6 <- data6 %>%
+  summarize(rho = cor(temp_from_median, daily_case_count, method = "spearman"))
+spearman7 <- data7 %>%
+  summarize(rho = cor(temp_from_median, daily_case_count, method = "spearman"))
+spearman8 <- data8 %>%
+  summarize(rho = cor(temp_from_median, daily_case_count, method = "spearman"))
+
+rho_spearman <- data.frame(spearman1, spearman2, spearman3, spearman4, spearman5, spearman6, spearman7, spearman8)
+rho_spearman
 ```
 
 

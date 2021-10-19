@@ -87,11 +87,11 @@ curl::curl_download(
 ## Loads the downloaded csv
 df_covid <- read_csv(filename_nyt)
 ```
+
 ```{r glimpse}
 df_pop %>% glimpse
 df_covid %>% glimpse
 ```
-
 
 ```{r combine}
 ## NOTE: No need to change; run this to produce a more convenient tibble
@@ -110,7 +110,6 @@ df_data <-
 glimpse(df_data)
 ```
 
-
 #### Normalize
 
 ```{r normalize}
@@ -124,6 +123,7 @@ df_normalized <-
 
 glimpse(df_normalized)
 ```
+
 ```{r tidy}
 df_tidy <- df_normalized %>% 
   separate(date,
@@ -166,7 +166,6 @@ Once that is figured out, we need to connect the datasets using location and tim
 ?ncdc
 ```
 
-
 ```{r get_weather_data}
 get_weather_data <- 
   function(FIPS) {
@@ -200,7 +199,6 @@ get_weather_data("36001") %>%
   head()
 ```
 
-
 ```{r weather-data}
 stations <-
   ghcnd_stations(refresh = FALSE) %>%
@@ -229,7 +227,6 @@ get_county_data <-
     combined_data
   }
 ```
-
 
 ```{r plot_county_data}
 plot_county_data <- 
@@ -295,6 +292,7 @@ plot_county_data(data7, "Dallas County (TX)")
 plot_county_data(data8, "Orleans Parish (GA)")
 
 ```
+
 ```{r correlation}
 
 pearson1 <- data1 %>%
@@ -339,4 +337,38 @@ rho_spearman <- data.frame(spearman1, spearman2, spearman3, spearman4, spearman5
 rho_spearman
 ```
 
+```{r}
+# put all data in one frame
+data = rbind(
+  data1,
+  data2,
+  data3,
+  data4,
+  data5,
+  data6,
+  data7,
+  data8
+)
+```
 
+```{r}
+# plot correlation between temp and cases
+data %>% 
+    ggplot(aes(
+      x  = temp_from_median,
+      y = daily_case_count
+      )) +
+    geom_smooth(se = FALSE, aes(color = county)) +
+    geom_smooth(se = FALSE, color = "black") +
+    labs(
+      title = "Correlation between Uncomfortable Temperature and COVID Cases",
+      y = "Daily Case Count",
+      x = "Difference in Temperature from 21 C"
+    ) +
+    annotate("label",
+       x = 38,
+       y = 36,
+       label = "Overall",
+       fill = "black",
+       color = "white")
+```

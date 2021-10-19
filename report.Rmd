@@ -1,24 +1,42 @@
-#Investigating Temperature & COVID-19
+---
+title: "COVID-19"
+author: "Team Delta"
+date: 2021-10-20
+output:
+  github_document:
+    toc: true
+---
+
+# Investigating Temperature & COVID-19 
+
 *Team Delta: Katie, Hazel, Jen, Sydney, & Shamama*
 
-##Question
-In this report, we aim to explore the following question: “Does outside temperature affect COVID cases?”
+## Question 
 
-##Relevant Background
-In our lived experience of this pandemic we noticed national spikes in covid cases in very hot and very cold months. We hypothesized that this could be because during months when outside temperature was not comfortable, people would tend to congregate inside more and therefore cause more spread in the virus. We wanted to see if the trend of harsher weather correlating with higher numbers of cases held up on a county level. 
+In this report, we aim to explore the following question: "Does outside temperature affect COVID cases?"
 
-##Data
-In addition to the [NYT COVID data](https://github.com/nytimes/covid-19-data) and [County-level Population Estimates](https://data.census.gov/cedsci/) provided to us in Challenge 06, we also used the [rOpenSci rnoaa package](https://docs.ropensci.org/rnoaa/). This package serves as an R interface to several different NOAA data sources, including historical weather data. Using this data, we want to plot COVID cases against temperature from May of 2020 to October of 2021 in seven counties. We choose the seven counties due to them having complete data in the noaa database, as well as being geographically diverse. In addition, we decided to only look at data from after May 2020, because before then, case counts were more unreliable before widespread testing became available. 
+## Relevant Background 
 
-###Quality of Data
+In our lived experience of this pandemic we noticed national spikes in covid cases in very hot and very cold months. We hypothesized that this could be because during months when outside temperature was not comfortable, people would tend to congregate inside more and therefore cause more spread in the virus. We wanted to see if the trend of harsher weather correlating with higher numbers of cases held up on a county level.
+
+## Data 
+
+In addition to the [NYT COVID data](https://github.com/nytimes/covid-19-data) and [County-level Population Estimates](https://data.census.gov/cedsci/) provided to us in Challenge 06, we also used the [rOpenSci rnoaa package](https://docs.ropensci.org/rnoaa/). This package serves as an R interface to several different NOAA data sources, including historical weather data. Using this data, we want to plot COVID cases against temperature from May of 2020 to October of 2021 in seven counties. We choose the seven counties due to them having complete data in the noaa database, as well as being geographically diverse. In addition, we decided to only look at data from after May 2020, because before then, case counts were more unreliable before widespread testing became available.
+
+### Quality of Data 
+
 As a national administration, NOAA's data can be assumed to be accurate, and generally unbiased. However, there are certain places where data are incomplete, or not in an ideal format. The most recent date of the dataset varies a lot by county. For example, Orleans Parish, LA has very recent historical data, ending about a week ago. However, Middlesex, CT data ends about a year ago. Additionally, in the daily temperature dataset, some locations have data for maximum temperature, some have data for minimum temperature, and some have data for average temperature. This makes it difficult to compare weather between locations.
 
-##Results & Observations
+## Results & Observations 
+
 (Enter plots/observations/descriptions here.)
 
-##Conclusions
+## Conclusions 
+
 After plotting COVID cases against the degrees above or below a range of comfortable living temperatures, we have observed that there is a somewhat significant correlation between temperature and COVID cases. However, this correlation does not seem to be consistent between different counties. It is also important to note that there are external factors, such as holiday seasons, that may also be affecting the observed correlation between temperature and cases. Therefore, we feel that there is correlation, not causation.
 
-##Remaining Questions
-Is the correlation between covid cases and weather due to the actual weather or that times of “extreme” weather also are times when people tend to hold gatherings (i.e. summer vacation and winter holidays.)
+## Remaining Questions 
 
+1.  Is the correlation between COVID cases and weather due to the actual weather or that times of "extreme" weather also are times when people tend to hold gatherings (i.e. summer vacation and winter holidays.)
+2.  How does the correlation between temperature and COVID cases change over geographic location?
+3.  How does temperature interact with other factors pertaining to COVID safety, eg. different legal limits on attendance of indoor vs outdoor gatherings, how much people take precautions.

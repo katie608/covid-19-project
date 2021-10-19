@@ -161,14 +161,15 @@ options(noaakey = "mXlBMxxMYipwDjTiNYqCqZSTVjvFyDSH")
 I have not been able to figure out a way to just set everything equal to a data frame. It seems like you need to make calls for a specific location using the functions.
 
 Once that is figured out, we need to connect the datasets using location and time. I think there should be some way to connect them using the ZIP (each county has 1 FIPS but can have multiple ZIP codes, however, we could probably find a lookup table of FIPS -\> ZIP in order to connect the 2 tables). If not, the location ID also uses the FIPS.
-```{r}
+
+```{r get_weather_data}
 get_weather_data <- 
   function(FIPS) {
     out1 <- ncdc(
     datasetid='GHCND', # Daily summaries dataset
     locationid = str_c("FIPS:", FIPS),
     datatypeid='TAVG',
-    startdate = '2020-01-01',
+    startdate = '2020-05-01',
     enddate = '2020-12-31' ,
     limit = 1000
     )
@@ -188,25 +189,7 @@ get_weather_data <-
   }
 ```
 
-```{r weather-data}
-# ncdc_locs(locationcategoryid='ZIP', sortfield='name', sortorder='desc')
-# ncdc_stations(datasetid='GHCND', locationid='FIPS:12017', stationid='GHCND:USC00084289')
 
-# Little plot example
-out <- get_weather_data("22071")
-
-out
-```
-
-```{r}
-out%>% 
-  ggplot(aes(x = as.Date(date), y = value)) +
-  geom_point() +
-  geom_smooth()
-
-
-```
- 
 ```{r weather-data}
 stations <-
   ghcnd_stations(refresh = FALSE) %>%
@@ -217,68 +200,8 @@ stations
 ```
 
 ## Plot Single County
-```{r}
-county_fips = '22071'
-weather_data <- get_weather_data(county_fips)
-weather_data
-```
 
-
-```{r}
-weather_data <- get_weather_data(county_fips) %>% 
-  mutate(date = as.Date(date)) 
-covid_data <- df_daily %>% 
-  filter(fips == county_fips)
-```
-
-
-```{r}
-combined_data <- covid_data %>%
-  left_join(weather_data, by = "date") %>% 
-  mutate(temp = value/10) %>%
-  mutate(temp_from_median = abs(temp - 22)) %>% 
-  select(-value)
-
-combined_data
-```
-
-
-```{r}
-combined_data %>% 
-  ggplot(aes(x = date)) +
-  
-  geom_smooth(mapping = aes(
-    y = temp_from_median, 
-    color = "Temperature"),
-    span = .1
-  ) +
-  
-  geom_smooth(mapping = aes(
-    y = daily_case_count / 10,
-    color = "Daily Cases"),
-    span = .01
-  ) +
-  
-  scale_y_continuous(
-    name = "Temperature (C)",
-    # Add a second axis and specify its features
-    sec.axis = sec_axis(
-      trans = ~.*10, 
-      name="Cases/day (avg)"
-      )
-  ) +
-  
-  theme(
-    axis.text.x = element_text(angle = 90),
-    legend.title = element_blank()
-    ) +
-  labs(title = "Orleans Parish", subtitle = " Correlation Between Covid Cases and Temperature") +
-
-  # ggtitle("Covid Cases vs Temperature in Orleans Parish") +
-  scale_x_date(date_labels="%b %y",date_breaks  ="3 month")
-
-```
-```{r}
+```{r get_county_data}
 get_county_data <- 
   function(county_fips) {
     weather_data <- get_weather_data(county_fips) %>%       mutate(date = as.Date(date)) 
@@ -287,9 +210,9 @@ get_county_data <-
       filter(fips == county_fips)
     
     combined_data <- covid_data %>%
-      left_join(weather_data, by = "date") %>% 
+      right_join(weather_data, by = "date") %>% 
       mutate(temp = value/10) %>%
-      mutate(temp_from_median = abs(temp - 22)) %>% 
+      mutate(temp_from_median = abs(temp - 21)) %>% 
       select(-value)
     
     combined_data
@@ -297,7 +220,7 @@ get_county_data <-
 ```
 
 
-```{r}
+```{r plot_county_data}
 plot_county_data <- 
   function(combined_data) {
   combined_data %>% 
@@ -305,7 +228,7 @@ plot_county_data <-
         
         geom_smooth(mapping = aes(
           y = temp_from_median, 
-          color = "Temperature"),
+          color = "Difference in Temperature from 21C"),
           span = .1
         ) +
         
@@ -327,7 +250,7 @@ plot_county_data <-
           axis.text.x = element_text(angle = 90),
           legend.title = element_blank()
         ) +
-        labs(title = "Orleans Parish", 
+        labs(title = "Orleans Parish (County)", 
              subtitle = "Correlation Between Covid Cases and Temperature"
         ) +
     
@@ -344,7 +267,12 @@ data <- get_county_data("22071")
 ```{r}
 plot_county_data(data)
 ```
+```{r correlation}
+data %>%
+  summarize(rho = cor(temp_from_median, daily_case_count, method = "pearson"))
 
-# Join the Data
+data %>%
+  summarize(rho = cor(temp_from_median, daily_case_count, method = "spearman"))
+```
 
-<!-- -------------------------------------------------- -->
+

@@ -7,36 +7,381 @@ output:
     toc: true
 ---
 
-# Investigating Temperature & COVID-19 
+# Investigating Temperature & COVID-19
 
 *Team Delta: Katie, Hazel, Jen, Sydney, & Shamama*
 
-## Question 
+## Question
 
 In this report, we aim to explore the following question: "Does outside temperature affect COVID cases?"
 
-## Relevant Background 
+## Relevant Background
 
 In our lived experience of this pandemic we noticed national spikes in covid cases in very hot and very cold months. We hypothesized that this could be because during months when outside temperature was not comfortable, people would tend to congregate inside more and therefore cause more spread in the virus. We wanted to see if the trend of harsher weather correlating with higher numbers of cases held up on a county level.
 
-## Data 
+
+
+## Data
 
 In addition to the [NYT COVID data](https://github.com/nytimes/covid-19-data) and [County-level Population Estimates](https://data.census.gov/cedsci/) provided to us in Challenge 06, we also used the [rOpenSci rnoaa package](https://docs.ropensci.org/rnoaa/). This package serves as an R interface to several different NOAA data sources, including historical weather data. Using this data, we want to plot COVID cases against temperature from May of 2020 to October of 2021 in seven counties. We choose the seven counties due to them having complete data in the noaa database, as well as being geographically diverse. In addition, we decided to only look at data from after May 2020, because before then, case counts were more unreliable before widespread testing became available.
 
-### Quality of Data 
+### Quality of Data
 
 As a national administration, NOAA's data can be assumed to be accurate, and generally unbiased. However, there are certain places where data are incomplete, or not in an ideal format. The most recent date of the dataset varies a lot by county. For example, Orleans Parish, LA has very recent historical data, ending about a week ago. However, Middlesex, CT data ends about a year ago. Additionally, in the daily temperature dataset, some locations have data for maximum temperature, some have data for minimum temperature, and some have data for average temperature. This makes it difficult to compare weather between locations.
 
-## Results & Observations 
+### Load and Configure Data
 
-(Enter plots/observations/descriptions here.)
+```{r setup}
+library(tidyverse)
+```
 
-## Conclusions 
+
+**Load Census Data.** 
+
+Make sure the column names are `id, Geographic Area Name, Estimate!!Total, Margin of Error!!Total`.
+
+See the README.md file for instructions to download this data from the Census Bureau website.
+
+```{r census-data}
+filename <- "./data/census.csv"
+
+## Load the data
+df_pop <- 
+  read_csv(filename, skip = 1) %>% 
+  mutate("fips" = str_remove(id, "\\d+[:alpha:]+"))
+```
+
+
+
+
+**Automated Download of NYT Data**
+
+The New York Times is publishing up-to-date data on COVID-19 on [GitHub](https://github.com/nytimes/covid-19-data).
+
+```{r covid-data}
+url_counties <- "https://raw.githubusercontent.com/nytimes/covid-19-data/master/us-counties.csv"
+
+filename_nyt <- "./data/nyt_counties.csv"
+
+## Download the data locally
+curl::curl_download(
+        url_counties,
+        destfile = filename_nyt
+      )
+
+## Loads the downloaded csv
+df_covid <- read_csv(filename_nyt)
+```
+
+Combine COVID and Census Data
+
+```{r combine}
+## NOTE: No need to change; run this to produce a more convenient tibble
+df_data <-
+  df_covid %>%
+  left_join(df_pop, by = "fips") %>% 
+  select(
+    date,
+    county,
+    state,
+    fips,
+    cases,
+    deaths,
+    population = `Estimate!!Total`
+  )
+```
+
+**Normalize COVID Data**
+
+```{r normalize}
+## TASK: Normalize cases and deaths
+df_normalized <-
+  df_data %>%
+  group_by(county) %>%
+  mutate("cases_per100k" = (cases / population) * 100000) %>%
+  mutate("deaths_per100k" = (deaths / population) * 100000) %>%
+  ungroup()
+
+glimpse(df_normalized)
+```
+
+```{r tidy}
+df_tidy <- df_normalized %>% 
+  separate(date,
+           into = c("year", "month", "day"),
+           sep = "-", 
+           remove = FALSE) %>% 
+  mutate(year = as.integer(year), 
+         month = as.integer(month), 
+         day = as.integer(day))
+
+df_tidy
+```
+
+```{r daily}
+df_daily <- df_tidy %>% 
+  group_by(fips) %>% 
+  mutate(
+    daily_case_count = cases_per100k - lag(cases_per100k),
+    daily_death_count = deaths_per100k - lag(deaths_per100k)
+  )
+                                           
+```
+
+
+**Weather Data**
+
+Follow instructions linked [here](https://docs.ropensci.org/rnoaa/articles/rnoaa.html)
+
+```{r weather-data-setup}
+library('rnoaa')
+# Replace with your key from here: https://www.ncdc.noaa.gov/cdo-web/token
+# Remember to delete your actual API key before git pushing!
+options(noaakey = "mXlBMxxMYipwDjTiNYqCqZSTVjvFyDSH")
+```
+
+
+```{r get_weather_data}
+get_weather_data <- 
+  function(FIPS) {
+    out1 <- ncdc(
+    datasetid='GHCND', # Daily summaries dataset
+    locationid = str_c("FIPS:", FIPS),
+    datatypeid='TAVG',
+    startdate = '2020-05-01',
+    enddate = '2020-12-31' ,
+    limit = 1000
+    )
+    
+    out2 <- ncdc(
+    datasetid='GHCND', # Daily summaries dataset
+    locationid = str_c("FIPS:", FIPS),
+    datatypeid='TAVG',
+    startdate = '2021-01-01',
+    enddate = '2021-10-16',
+    limit = 1000
+    )
+    
+  out <- bind_rows(out1$data, out2$data)
+  #Combine took too long
+  # out <- ncdc_combine(out1, out2)
+  out
+  }
+```
+
+
+```{r test-get-weather-data}
+get_weather_data("36001") %>% 
+  head()
+```
+
+
+## Results & Observations
+
+### County-Level Plots
+
+We decided to find a variety of counties across the US with complete weather data, in order to get an idea of the geographic variation in correlation between COVID cases and temperature.
+
+We also included a variable in our analysis called `temp_from_median`. This variable is the absolute value of the difference between the average weather in a specific day, and the ideal temperature of 21 C. According to most definitions, 21 C is around the ideal room temperature. It follows that temperatures would become less comfortable to humans as they get further from this ideal temperature.
+
+Here, we define a function to get data for a specific county using the NOAA API
+
+```{r get_county_data}
+get_county_data <- 
+  function(county_fips) {
+    weather_data <- get_weather_data(county_fips) %>%       
+      mutate(date = as.Date(date)) 
+    
+    covid_data <- df_daily %>% 
+      filter(fips == county_fips)
+    
+    combined_data <- covid_data %>%
+      right_join(weather_data, by = "date") %>% 
+      mutate(temp = value/10) %>%
+      mutate(temp_from_median = abs(temp - 21)) %>% 
+      select(-value)
+    
+    combined_data
+  }
+```
+
+Here we define a function to plot data for one county.
+
+```{r plot_county_data}
+plot_county_data <- 
+  function(combined_data, county_name) {
+  titlename <- county_name
+  combined_data %>% 
+        ggplot(aes(x = date)) +
+        geom_smooth(mapping = aes(
+          y = temp_from_median, 
+          color = "Difference in \nTemperature \nfrom 21C"),
+          span = .1,
+          se = FALSE
+        ) +
+        geom_smooth(mapping = aes(
+          y = daily_case_count / 10,
+          color = "Daily Cases"),
+          span = .01,
+          se = FALSE
+        ) +
+        scale_y_continuous(
+          name = "Temperature (C)",
+          sec.axis = sec_axis(
+            trans = ~.*10, 
+            name="Cases/day (avg)"
+            )
+        ) +
+        theme(
+          axis.text.x = element_text(angle = 90),
+          legend.title = element_blank()
+        ) +
+        labs(title = titlename, 
+             subtitle = "Correlation Between Covid Cases and Temperature"
+        ) +
+        scale_x_date(date_labels="%b %y",
+                     date_breaks  ="3 month")
+  }
+```
+
+Note that the following block of code sometimes throws an http error due to the NOAA API. This error can usually be solved by running the code again, but occasionally restarting R is needed.
+
+```{r get-all-weather-data}
+data1 <- get_county_data("47157")
+data2 <- get_county_data("17031")
+data3 <- get_county_data("36001")
+data4 <- get_county_data("13121")
+data5 <- get_county_data("04013")
+data6 <- get_county_data("41051")
+data7 <- get_county_data("48113")
+data8 <- get_county_data("22071")
+```
+
+```{r plot-all-weather-data}
+plot_county_data(data1, "Shelby County (TN)")
+plot_county_data(data2, "Cook County (IL)")
+plot_county_data(data3, "Albany County (NY)")
+plot_county_data(data4, "Fulton County (GA)")
+plot_county_data(data5, "Maricopa County (AZ)")
+plot_county_data(data6, "Multnomah County (OR)")
+plot_county_data(data7, "Dallas County (TX)")
+plot_county_data(data8, "Orleans Parish (GA)")
+```
+
+
+```{r correlate-cases-temp}
+pearson1 <- data1 %>%
+  summarize(rho = cor(temp_from_median, daily_case_count, method = "pearson"))
+pearson2 <- data2 %>%
+  summarize(rho = cor(temp_from_median, daily_case_count, method = "pearson"))
+pearson3 <- data3 %>%
+  summarize(rho = cor(temp_from_median, daily_case_count, method = "pearson"))
+pearson4 <- data4 %>%
+  summarize(rho = cor(temp_from_median, daily_case_count, method = "pearson"))
+pearson5 <- data5 %>%
+  summarize(rho = cor(temp_from_median, daily_case_count, method = "pearson"))
+pearson6 <- data6 %>%
+  summarize(rho = cor(temp_from_median, daily_case_count, method = "pearson"))
+pearson7 <- data7 %>%
+  summarize(rho = cor(temp_from_median, daily_case_count, method = "pearson"))
+pearson8 <- data8 %>%
+  summarize(rho = cor(temp_from_median, daily_case_count, method = "pearson"))
+
+rho_pearson <- data.frame(pearson1, pearson2, pearson3, pearson4, pearson5, pearson6, pearson7, pearson8)
+rho_pearson
+
+
+spearman1 <- data1 %>%
+  summarize(rho = cor(temp_from_median, daily_case_count, method = "spearman"))
+spearman2 <- data2 %>%
+  summarize(rho = cor(temp_from_median, daily_case_count, method = "spearman"))
+spearman3 <- data3 %>%
+  summarize(rho = cor(temp_from_median, daily_case_count, method = "spearman"))
+spearman4 <- data4 %>%
+  summarize(rho = cor(temp_from_median, daily_case_count, method = "spearman"))
+spearman5 <- data5 %>%
+  summarize(rho = cor(temp_from_median, daily_case_count, method = "spearman"))
+spearman6 <- data6 %>%
+  summarize(rho = cor(temp_from_median, daily_case_count, method = "spearman"))
+spearman7 <- data7 %>%
+  summarize(rho = cor(temp_from_median, daily_case_count, method = "spearman"))
+spearman8 <- data8 %>%
+  summarize(rho = cor(temp_from_median, daily_case_count, method = "spearman"))
+
+rho_spearman <- data.frame(spearman1, spearman2, spearman3, spearman4, spearman5, spearman6, spearman7, spearman8)
+rho_spearman
+```
+
+
+
+```{r prepare-data}
+# put all data in one frame
+data = rbind(
+  data1,
+  data2,
+  data3,
+  data4,
+  data5,
+  data6,
+  data7,
+  data8
+)
+
+locations <-
+  tribble(
+    ~county, ~location,
+    "Shelby", "Shelby County, TN",
+    "Cook", "Cook County, IL",
+    "Albany", "Albany County, NY",
+    "Fulton", "Fulton County, GA",
+    "Maricopa", "Maricopa County, AZ",
+    "Multnomah", "Multnomah County, OR",
+    "Dallas", "Dallas County, TX",
+    "Orleans", "Orleans Parish, LA"
+  )
+
+data <-
+  data %>%
+  left_join(locations, by = "county")
+```
+
+
+```{r}
+# plot correlation between temp and cases
+data %>% 
+  ggplot(aes(
+    x  = temp_from_median,
+    y = daily_case_count
+    )) +
+  geom_smooth(se = FALSE, aes(color = location)) +
+  geom_smooth(se = FALSE, color = "black") +
+  labs(
+    title = "Correlation between Uncomfortable Temperature and COVID Cases",
+    y = "Daily Case Count",
+    x = "Difference in Temperature from 21 C"
+  ) +
+  annotate("label",
+     x = 36,
+     y = 34,
+     label = "Overall",
+     fill = "black",
+     color = "white") +
+  annotate("label",
+       x = 32,
+       y = 0,
+       label = "Less Comfortable ->",
+       fill = "white",
+       color = "black")
+```
+
+
+## Conclusions
 
 After plotting COVID cases against the degrees above or below a range of comfortable living temperatures, we have observed that there is a somewhat significant correlation between temperature and COVID cases. However, this correlation does not seem to be consistent between different counties. It is also important to note that there are external factors, such as holiday seasons, that may also be affecting the observed correlation between temperature and cases. Therefore, we feel that there is correlation, not causation.
 
-## Remaining Questions 
+## Remaining Questions
 
 1.  Is the correlation between COVID cases and weather due to the actual weather or that times of "extreme" weather also are times when people tend to hold gatherings (i.e. summer vacation and winter holidays.)
 2.  How does the correlation between temperature and COVID cases change over geographic location?
 3.  How does temperature interact with other factors pertaining to COVID safety, eg. different legal limits on attendance of indoor vs outdoor gatherings, how much people take precautions.
+4. Why are there fewer cases when the weather is very extremely uncomfortable than when the weather is somewhat uncomfortable?

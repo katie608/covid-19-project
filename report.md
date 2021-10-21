@@ -591,9 +591,8 @@ After plotting COVID cases against the degrees above or below a range of
 comfortable living temperatures, we have observed that there is a
 somewhat significant correlation between temperature and COVID cases.
 However, this correlation does not seem to be consistent between
-different counties. It is also important to note that there are external
-factors, such as holiday seasons, that may also be affecting the
-observed correlation between temperature and cases. Therefore, we feel
+different counties. In addition, there was not consistent correlation across temperatures even within a given county. Dallas County, for example, had very high variance in its correlation between the temperature and daily COVID cases across it's temperature range. It is also important to note that there are external factors that may also be affecting the
+observed correlation between temperature and cases. With holiday seasons, there is increased travel and many people gathering together in close proximity. This would increase the likelihood of infection. In addition, we did not take into account the difference in temperature from one day to the next. If there was a string of days with uncomfortable temperatures then a couple days with perfect temperature, there would be a spike soon after those couple of days. Therefore, due to the lack of consistent correlation and these other external factors, at this time, we can only determine
 that there is correlation, not causation.
 
 ## Remaining Questions
